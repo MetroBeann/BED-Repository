@@ -130,6 +130,67 @@ class User {
             return {message: "Delete unsuccessful"};
         }
     }
+
+    static async searchUsers(searchTerm) {
+        const connection = await sql.connect(dbConfig);
+    
+        try {
+          const query = `
+            SELECT *
+            FROM Users
+            WHERE username LIKE '%${searchTerm}%'
+              OR email LIKE '%${searchTerm}%'
+          `;
+    
+          const result = await connection.request().query(query);
+          return result.recordset;
+        } catch (error) {
+          throw new Error("Error searching users"); // Or handle error differently
+        } finally {
+          await connection.close(); // Close connection even on errors
+        }
+      }
+
+      static async getUsersWithBooks() {
+        const connection = await sql.connect(dbConfig);
+    
+        try {
+          const query = `
+            SELECT u.id AS user_id, u.username, u.email, b.id AS book_id, b.title, b.author
+            FROM Users u
+            LEFT JOIN UserBooks ub ON ub.user_id = u.id
+            LEFT JOIN Books b ON ub.book_id = b.id
+            ORDER BY u.username;
+          `;
+    
+          const result = await connection.request().query(query);
+    
+          // Group users and their books
+          const usersWithBooks = {};
+          for (const row of result.recordset) {
+            const userId = row.user_id;
+            if (!usersWithBooks[userId]) {
+              usersWithBooks[userId] = {
+                id: userId,
+                username: row.username,
+                email: row.email,
+                books: [],
+              };
+            }
+            usersWithBooks[userId].books.push({
+              id: row.book_id,
+              title: row.title,
+              author: row.author,
+            });
+          }
+    
+          return Object.values(usersWithBooks);
+        } catch (error) {
+          throw new Error("Error fetching users with books");
+        } finally {
+          await connection.close();
+        }
+      }
 }
 
 module.exports = User;
